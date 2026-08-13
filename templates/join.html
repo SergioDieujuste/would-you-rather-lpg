@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rejoindre la partie</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <button onclick="toggleDarkMode()" class="btn-darkmode">🌙 / ☀️</button>
+
+    <div class="container">
+        <h2>🎮 Rejoindre le jeu</h2>
+        
+        <!-- Affichage des messages d'erreur Flask si besoin -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                    {% for message in messages %}
+                        <p style="margin: 0;">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <p>Entre ton pseudo pour commencer :</p>
+        
+        <form action="{{ url_for('join') }}" method="POST" onsubmit="document.getElementById('btn-submit').disabled = true;">
+            <input type="text" name="voter_name" placeholder="Ton pseudo..." required maxlength="20" pattern=".*\S.*" title="Le pseudo ne peut pas être vide" autofocus><br>
+            <button type="submit" id="btn-submit" class="btn" style="margin-top: 15px;">C'est parti ! 🚀</button>
+        </form>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        }
+
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    </script>
+    <script>
+        // Envoie un signal de présence au serveur toutes les 4 secondes
+        setInterval(() => {
+            fetch('/api/ping', { method: 'POST' });
+        }, 4000);
+    </script>
+</body>
+</html>

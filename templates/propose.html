@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 1 : Pose tes questions !</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Bouton Mode Nuit -->
+    <button onclick="toggleDarkMode()" class="btn-darkmode">🌙 / ☀️</button>
+
+    <!-- Carte centrale -->
+    <div class="container">
+        <h2>Phase 1 : Pose tes questions ! ✍️</h2>
+        
+        <div class="timer-box">
+            ⏰ Temps restant : <span id="phase-timer">{{ time_remaining if time_remaining is defined else 120 }}</span>s
+        </div>
+
+        <p style="margin-bottom: 20px; color: #666;">Propose un maximum de dilemmes avant la fin du temps !</p>
+
+        <!-- Affichage des messages de confirmation / d'erreur -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div style="padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center;
+                                background-color: {{ '#d4edda' if category == 'success' else '#f8d7da' }};
+                                color: {{ '#155724' if category == 'success' else '#721c24' }};">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('propose') }}" method="POST" id="propose-form">
+            <div class="input-group">
+                <input type="text" name="author" value="{{ player_name }}" placeholder="Ton pseudo" required readonly style="background-color: rgba(0,0,0,0.05);">
+            </div>
+            <div class="input-group">
+                <input type="text" name="option_red" placeholder="Option Rouge (ex: Avoir des ailes)" required autocomplete="off" maxlength="150">
+            </div>
+            <div class="input-group">
+                <input type="text" name="option_blue" placeholder="Option Bleue (ex: Être invisible)" required autocomplete="off" maxlength="150">
+            </div>
+            <button type="submit" id="btn-submit" class="btn-submit">Envoyer la question 🚀</button>
+        </form>
+    </div>
+
+    <script>
+        // --- GESTION DU MODE NUIT ---
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+
+        // --- TIMER EN FRONTEND ---
+        let timeRemaining = parseInt("{{ time_remaining if time_remaining is defined else 120 }}", 10);
+        const timerElem = document.getElementById('phase-timer');
+        
+        const countdownInterval = setInterval(() => {
+            if (timeRemaining > 0) {
+                timeRemaining--;
+                if (timerElem) timerElem.textContent = timeRemaining;
+            } else {
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+
+        // --- VERIFICATION ET REDIRECTION DYNAMIQUE ---
+        setInterval(() => {
+            fetch('/api/game-status')
+                .then(res => res.json())
+                .then(data => {
+                    // Reprendre le timer serveur si transmis pour éviter les décalages
+                    if (data.time_remaining !== undefined) {
+                        timeRemaining = data.time_remaining;
+                        if (timerElem) timerElem.textContent = timeRemaining;
+                    }
+
+                    // Si la phase n'est plus PROPOSE, on redirige systématiquement
+                    if (data.phase && data.phase !== 'PROPOSE') {
+                        window.location.href = data.redirect_url || '/game';
+                    }
+                })
+                .catch(err => console.error("Erreur d'état:", err));
+        }, 2500);
+    </script>
+</body>
+</html>

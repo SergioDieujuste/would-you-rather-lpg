@@ -1,0 +1,11 @@
+# Base de données SQLite locale
+instance/
+*.db
+
+# Fichiers Python temporaires
+__pycache__/
+*.pyc
+
+# Environnement virtuel Python (si tu en utilises un)
+venv/
+.venv/

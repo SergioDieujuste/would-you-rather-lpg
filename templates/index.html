@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tu préfères ?</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Bouton Mode Nuit -->
+    <button onclick="toggleDarkMode()" class="btn-darkmode">🌙 / ☀️</button>
+
+    <div class="container">
+        {% if end_of_game %}
+            <h2>🎉 Partie terminée !</h2>
+            <p>Toutes les questions ont été posées ! Merci d'avoir joué.</p>
+            <p style="color: #666; font-style: italic;">En attente de l'hôte pour relancer une partie...</p>
+        {% else %}
+
+            <small>Question {{ question_num }} / {{ total_questions }}</small>
+            
+            <div class="timer-box" id="timer-box" style="display: {% if vote_remaining <= 0 %}none{% else %}block{% endif %};">
+                ⏰ Temps pour voter : <span id="vote-timer">{{ vote_remaining }}</span>s
+            </div>
+
+            <h2>Tu préfères...</h2>
+
+            <form action="{{ url_for('voter', question_id=question.id) }}" method="POST">
+                <p style="margin-bottom: 15px;">Joueur : <strong>{{ voter_name }}</strong></p>
+
+                <div class="options-container">
+                    <button type="submit" name="choice" value="red" class="btn-option btn-red" id="btn-red" {% if vote_remaining <= 0 or user_has_voted %}disabled{% endif %}>
+                        {{ question.option_red }}
+                    </button>
+                    <button type="submit" name="choice" value="blue" class="btn-option btn-blue" id="btn-blue" {% if vote_remaining <= 0 or user_has_voted %}disabled{% endif %}>
+                        {{ question.option_blue }}
+                    </button>
+                </div>
+            </form>
+
+            {% if user_has_voted %}
+                <p style="color: #2ea44f; font-weight: bold; margin-top: 10px;">✅ Vote enregistré (Choix : {{ 'Rouge' if user_choice == 'red' else 'Bleu' }}) !</p>
+            {% endif %}
+
+            <!-- ZONE DES RÉSULTATS -->
+            <div class="results-box reveal-animation" id="results-section" style="display: {% if vote_remaining <= 0 or user_has_voted %}block{% else %}none{% endif %};">
+                <h3 class="results-title">📊 Résultats :</h3>
+                
+                <div class="stat-bar-container">
+                    <div class="stat-bar-red" id="bar-red" style="width: {{ red_pct }}%;">
+                        <span id="red-pct">{% if red_pct > 0 %}{{ red_pct }}%{% endif %}</span>
+                    </div>
+                    <div class="stat-bar-blue" id="bar-blue" style="width: {{ blue_pct }}%;">
+                        <span id="blue-pct">{% if blue_pct > 0 %}{{ blue_pct }}%{% endif %}</span>
+                    </div>
+                </div>
+
+                <div class="voters-grid">
+                    <div class="voters-card red">
+                        <h4>🔴 Ont choisi "{{ question.option_red }}" :</h4>
+                        <ul id="red-votes-list">
+                            {% for voter in red_votes %}
+                                <li>• {{ voter }}</li>
+                            {% else %}
+                                <li><em>Personne</em></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <div class="voters-card blue">
+                        <h4>🔵 Ont choisi "{{ question.option_blue }}" :</h4>
+                        <ul id="blue-votes-list">
+                            {% for voter in blue_votes %}
+                                <li>• {{ voter }}</li>
+                            {% else %}
+                                <li><em>Personne</em></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="next-timer">
+                    ➡️ Prochaine question dans : <span id="next-timer">{{ next_question_remaining }}</span>s
+                </div>
+            </div>
+
+        {% endif %}
+    </div>
+
+    <!-- CODE JAVASCRIPT -->
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+
+        const currentQuestionId = {{ question.id if question else 'null' }};
+        const isEndOfGame = {{ 'true' if end_of_game else 'false' }};
+
+        if (!isEndOfGame) {
+            const intervalId = setInterval(() => {
+                fetch('/api/game-status')
+                    .then(res => res.json())
+                    .then(data => {
+                        // 1. Changement de question ou fin de jeu -> Rechargement
+                        if (data.end_of_game || (data.question_id && data.question_id !== currentQuestionId)) {
+                            clearInterval(intervalId);
+                            window.location.reload();
+                            return;
+                        }
+
+                        // 2. Mise à jour des compteurs de temps
+                        const voteTimerElem = document.getElementById('vote-timer');
+                        if (voteTimerElem && data.vote_remaining !== undefined) {
+                            voteTimerElem.textContent = data.vote_remaining;
+                        }
+
+                        const nextTimerElem = document.getElementById('next-timer');
+                        if (nextTimerElem && data.next_question_remaining !== undefined) {
+                            nextTimerElem.textContent = data.next_question_remaining;
+                        }
+
+                        // 3. Mise à jour dynamique des barres et des pourcentages
+                        const barRed = document.getElementById('bar-red');
+                        const barBlue = document.getElementById('bar-blue');
+                        const redPctSpan = document.getElementById('red-pct');
+                        const bluePctSpan = document.getElementById('blue-pct');
+
+                        if (barRed && barBlue && data.red_pct !== undefined && data.blue_pct !== undefined) {
+                            barRed.style.width = data.red_pct + '%';
+                            barBlue.style.width = data.blue_pct + '%';
+                            
+                            if (redPctSpan) redPctSpan.textContent = data.red_pct > 0 ? data.red_pct + '%' : '';
+                            if (bluePctSpan) bluePctSpan.textContent = data.blue_pct > 0 ? data.blue_pct + '%' : '';
+                        }
+
+                        // 4. Mise à jour de la liste des votants Rouges
+                        const redList = document.getElementById('red-votes-list');
+                        if (redList && data.red_votes) {
+                            redList.innerHTML = data.red_votes.length > 0 
+                                ? data.red_votes.map(name => `<li>• ${name}</li>`).join('')
+                                : '<li><em>Personne</em></li>';
+                        }
+
+                        // 5. Mise à jour de la liste des votants Bleus
+                        const blueList = document.getElementById('blue-votes-list');
+                        if (blueList && data.blue_votes) {
+                            blueList.innerHTML = data.blue_votes.length > 0 
+                                ? data.blue_votes.map(name => `<li>• ${name}</li>`).join('')
+                                : '<li><em>Personne</em></li>';
+                        }
+                    })
+                    .catch(err => console.error("Erreur sync:", err));
+            }, 1000);
+        }
+    </script>
+    <script>
+        // Écoute du statut pour rediriger tous les joueurs dès que l'admin réinitialise
+        setInterval(() => {
+            fetch('/api/game-status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.phase === 'LOBBY') {
+                        window.location.href = '/';
+                    }
+                })
+                .catch(err => console.error(err));
+        }, 2000);
+    </script>
+    <script>
+        // Envoie un signal de présence au serveur toutes les 4 secondes
+        setInterval(() => {
+            fetch('/api/ping', { method: 'POST' });
+        }, 4000);
+    </script>
+</body>
+</html>

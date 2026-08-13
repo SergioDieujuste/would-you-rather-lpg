@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salle d'attente</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Bouton Mode Nuit -->
+    <button onclick="toggleDarkMode()" class="btn-darkmode">🌙 / ☀️</button>
+
+    <!-- Carte centrale -->
+    <div class="container">
+        <h2>⏳ Salle d'attente (Lobby)</h2>
+        <p>Connecté en tant que : <strong>{{ player_name }}</strong> (<a href="{{ url_for('leave_lobby') }}" class="sub-link">Changer de pseudo</a>)</p>
+        <p style="color: #666; font-style: italic; margin-top: 5px;">En attente du lancement par l'hôte...</p>
+
+        <hr>
+
+        <h3>👥 Joueurs présents (<span id="player-count">{{ players|length }}</span>) :</h3>
+        <ul id="player-list" style="list-style: none; padding: 0; margin-top: 15px;">
+            {% for player in players %}
+                <li style="padding: 8px; background: rgba(0,0,0,0.05); margin-bottom: 5px; border-radius: 6px;">{{ player }}</li>
+            {% else %}
+                <li style="color: #888; font-style: italic;">Aucun joueur pour le moment...</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+
+        // Rafraîchissement automatique du statut et des joueurs (toutes les 2 secondes)
+        setInterval(() => {
+            fetch('/api/game-status')
+                .then(res => res.json())
+                .then(data => {
+                    // 1. Redirection automatique si le jeu démarre
+                    if (data.phase && data.phase !== 'LOBBY') {
+                        window.location.href = data.redirect_url || '/game';
+                        return;
+                    }
+
+                    // 2. Mise à jour dynamique de la liste des joueurs si transmise par l'API
+                    if (data.players && Array.isArray(data.players)) {
+                        const listElem = document.getElementById('player-list');
+                        const countElem = document.getElementById('player-count');
+
+                        countElem.textContent = data.players.length;
+
+                        if (data.players.length === 0) {
+                            listElem.innerHTML = '<li style="color: #888; font-style: italic;">Aucun joueur pour le moment...</li>';
+                        } else {
+                            listElem.innerHTML = data.players
+                                .map(p => `<li style="padding: 8px; background: rgba(0,0,0,0.05); margin-bottom: 5px; border-radius: 6px;">${p}</li>`)
+                                .join('');
+                        }
+                    }
+                })
+                .catch(err => console.error("Erreur lors de la mise à jour du statut :", err));
+        }, 2000);
+    </script>
+    <script>
+        // Envoie un signal de présence au serveur toutes les 4 secondes
+        setInterval(() => {
+            fetch('/api/ping', { method: 'POST' });
+        }, 4000);
+    </script>
+</body>
+</html>
